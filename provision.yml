@@ -1,0 +1,68 @@
+name: Set up PXE Server
+hosts: pxeserver
+become: yes
+vars_files:
+- defaults/main.yml
+tasks:
+ - name: setup repositories
+   replace:
+    path: "{{ item }}"
+    regexp: 'mirrorlist'
+    replace: '#mirrorlist'
+    with_items:
+      - /etc/yum.repos.d/CentOS-Linux-AppStream.repo
+      - /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
+ - name : setup repositories
+   replace: 
+    path: "{{ item }}"
+    regexp: '#baseurl=http://mirror.centos.org'
+    replace: 'baseurl=http://vault.centos.org'
+    with_items:
+      - /etc/yum.repos.d/CentOS-Linux-AppStream.repo
+      - /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
+ - name: install soft
+   yum:
+    name:
+      - vim
+      - wget
+      - epel-release
+      - httpd
+      - tftp-server
+      - dhcp-server
+    state: present
+    update_cashe: true
+ - name: Download ISO image CentOS-Stream-8-20230612
+   get_url:
+    url: https://mirror.yandex.ru/centos/8-stream/isos/x86_64/CentOS-Stream-8-20230612.0-x86_64-dvd1.iso
+    dest: ~/CentOS-Stream-8-20230612.0-x86_64-dvd1.iso
+    mode: '0755'
+ - name: create directory for ISO
+   file:
+   path: /iso
+   state: directory
+   mode: '0755'   
+ - name: mount ISO image
+   mount:
+    path: /iso
+    src: /root/CentoOS-Stream-8-20230612.0-x86_64-dvd1.iso
+    fstype: iso9660
+    opts: loop,ro
+    state: mounted
+ - name: copy file /mnt /iso
+   copy:
+    dst: /mnt
+    src: /iso
+    remote_src: yes
+    directory_mode: yes
+ - name: set up httpd config
+   template:
+      src: conf/pxeboot.conf
+      dest: /etc/httpd/conf.d/pxeboot.conf 
+      owner: root
+      group: root
+      mode: 0640
+ - name: restart httpd
+   service:
+    name: httpd
+    state: restarted
+    enable: true
